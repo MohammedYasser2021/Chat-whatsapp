@@ -16,6 +16,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [hasMedia, setHasMedia] = useState(false);
+  const [qrCode, setQrCode] = useState(null);
 
   useEffect(() => {
     checkStatus();
@@ -27,8 +28,23 @@ function App() {
     try {
       const response = await axios.get(`${API_BASE_URL}/status`);
       setStatus(response.data.status);
+      setQrCode(response.data.qrCode);
     } catch (error) {
       console.error('Error checking status:', error);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await axios.post(`${API_BASE_URL}/disconnect`);
+      toast.success('تم قطع الاتصال بنجاح');
+      setResults(null);
+      setPhoneNumbers([]);
+      setMessage('');
+      setMediaFiles([]);
+      setHasMedia(false);
+    } catch (error) {
+      toast.error('حدث خطأ أثناء قطع الاتصال');
     }
   };
 
@@ -129,6 +145,8 @@ function App() {
           status={status}
           numbers={phoneNumbers}
           results={results}
+          qrCode={qrCode}
+          onDisconnect={handleDisconnect}
         />
 
         <FileUpload 

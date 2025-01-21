@@ -1,3 +1,6 @@
+body, html, *, *::after, *::before {
+  font-family: "Cairo", serif !important;
+}
 .App {
   max-width: 800px;
   margin: 0 auto;

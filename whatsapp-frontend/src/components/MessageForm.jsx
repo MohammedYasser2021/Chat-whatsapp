@@ -3,37 +3,41 @@ import { Send } from 'lucide-react';
 
 function MessageForm({ message, setMessage, onSend, isLoading, hasMedia }) {
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md space-y-4">
-      <div className="space-y-2">
-        <label htmlFor="message" className="block text-sm font-medium text-gray-700">
+    <div className="p-8 bg-white rounded-2xl shadow-lg space-y-6 max-w-3xl mx-auto" dir="rtl">
+      <div className="space-y-3">
+        <label htmlFor="message" className="block text-lg font-semibold text-gray-800 text-right">
           الرسالة
         </label>
         <textarea
           id="message"
           rows={4}
-          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          className="block w-full rounded-xl border border-gray-200 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 sm:text-md text-right p-4 transition duration-200 ease-in-out resize-none"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="اكتب رسالتك هنا..."
+          dir="rtl"
         />
       </div>
 
       <button
         onClick={onSend}
         disabled={isLoading || (!message && !hasMedia)}
-        className={`w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white 
+        className={`w-full flex items-center justify-center px-6 py-3 border border-transparent text-md font-medium rounded-xl text-white transition-all duration-200 ease-in-out transform hover:scale-[1.02] 
           ${isLoading || (!message && !hasMedia)
-            ? 'bg-gray-400 cursor-not-allowed'
-            : 'bg-indigo-600 hover:bg-indigo-700'
+            ? 'bg-gray-400 cursor-not-allowed opacity-75'
+            : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg'
           }`}
       >
         {isLoading ? (
-          <span>جاري الإرسال...</span>
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-3"></div>
+            <span>جاري الإرسال...</span>
+          </div>
         ) : (
-          <>
-            <Send className="mr-2 h-4 w-4" />
-            <span>إرسال</span>
-          </>
+          <div className="flex items-center">
+            <span className="text-lg">إرسال</span>
+            <Send className="ml-3 h-5 w-5" />
+          </div>
         )}
       </button>
     </div>
