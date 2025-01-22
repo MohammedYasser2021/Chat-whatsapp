@@ -30,52 +30,137 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// WhatsApp Client
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        args: ['--no-sandbox']
-    }
-});
-
+let client;
 let connectionStatus = 'disconnected';
 let qrCodeData = null;
 
-client.on('qr', (qr) => {
-    connectionStatus = 'waiting-for-qr';
-    qrCodeData = qr;
-    qrcode.generate(qr, { small: true });
-    console.log('QR Code generated! Scan with WhatsApp');
-});
-
-client.on('ready', () => {
-    connectionStatus = 'connected';
-    console.log('WhatsApp client is ready!');
-});
-
-client.on('authenticated', () => {
-    console.log('WhatsApp authenticated successfully!');
-});
-
-client.on('disconnected', () => {
+async function destroyClient() {
+    connectionStatus = 'disconnecting'; // Add transitional state
+    if (client) {
+        try {
+            await client.destroy();
+            client = null;
+        } catch (error) {
+            console.error('Error destroying client:', error);
+        }
+    }
     connectionStatus = 'disconnected';
-    console.log('WhatsApp disconnected!');
-});
+    qrCodeData = null;
+}
 
-client.initialize();
+async function clearAuthData() {
+    try {
+        const authDir = path.join(process.cwd(), '.wwebjs_auth');
+        if (fs.existsSync(authDir)) {
+            fs.rmSync(authDir, { recursive: true, force: true });
+        }
+    } catch (error) {
+        console.error('Error clearing auth data:', error);
+    }
+}
+
+function initializeWhatsApp() {
+    connectionStatus = 'initializing'; // Add transitional state
+    client = new Client({
+        authStrategy: new LocalAuth(),
+        puppeteer: {
+            args: ['--no-sandbox']
+        }
+    });
+
+    client.on('qr', (qr) => {
+        connectionStatus = 'waiting-for-qr';
+        qrCodeData = qr;
+        qrcode.generate(qr, { small: true });
+        console.log('QR Code generated! Scan with WhatsApp');
+    });
+
+    client.on('loading_screen', (percent, message) => {
+        connectionStatus = `connecting:${percent}`; // Add loading state with percentage
+        console.log('Loading:', percent, '%', message);
+    });
+
+    client.on('ready', () => {
+        connectionStatus = 'connected';
+        qrCodeData = null;
+        console.log('WhatsApp client is ready!');
+    });
+
+    client.on('authenticated', () => {
+        connectionStatus = 'authenticating'; // Add transitional state
+        console.log('WhatsApp authenticated successfully!');
+    });
+
+    client.on('disconnected', async () => {
+        console.log('WhatsApp disconnected!');
+        await destroyClient();
+        await clearAuthData();
+        initializeWhatsApp();
+    });
+
+    try {
+        client.initialize().catch(error => {
+            console.error('Error during initialization:', error);
+            connectionStatus = 'disconnected';
+        });
+    } catch (error) {
+        console.error('Error initializing client:', error);
+        connectionStatus = 'disconnected';
+    }
+}
+
+// Initialize WhatsApp client
+initializeWhatsApp();
 
 // Routes
 app.get('/status', (req, res) => {
     res.json({ 
         status: connectionStatus,
-        qrCode: connectionStatus === 'waiting-for-qr' ? qrCodeData : null
+        qrCode: qrCodeData
     });
+});
+
+app.post('/disconnect', async (req, res) => {
+    try {
+        await destroyClient();
+        await clearAuthData();
+        
+        // Set status to initializing immediately
+        connectionStatus = 'initializing';
+        
+        // Initialize new client immediately
+        initializeWhatsApp();
+        
+        res.json({ 
+            success: true, 
+            message: 'Disconnected successfully',
+            status: connectionStatus
+        });
+    } catch (error) {
+        console.error('Error during disconnect:', error);
+        // Even if there's an error, we want to ensure we're in a clean state
+        connectionStatus = 'initializing';
+        qrCodeData = null;
+        
+        // Initialize new client
+        initializeWhatsApp();
+        
+        res.json({ 
+            success: true, 
+            message: 'Disconnected with recovery',
+            status: connectionStatus
+        });
+    }
 });
 
 app.post('/send-bulk-messages', async (req, res) => {
     try {
         const { numbers, message, mediaPaths } = req.body;
         console.log('Received request:', { numbers, message, mediaPaths });
+
+        if (!client) {
+            return res.status(400).json({ error: 'WhatsApp client not initialized' });
+        }
 
         // Validate request data
         if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
